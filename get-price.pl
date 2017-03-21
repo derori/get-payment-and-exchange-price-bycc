@@ -4,15 +4,15 @@ use 5.24.1;
 use Data::Dumper;
 use LWP;
 use LWP::UserAgent::JSON;
+use HTTP::Request::JSON;
 use JSON;
 use File::Slurp;
-use Digest::SHA qw(hmac_sha256_hex);
+use Digest::SHA qw(sha256 hmac_sha256_base64 sha256_hex hmac_sha256_hex);
 
 use constant ACCESS_KEY => $ENV{"ACCESS_KEY"};
 use constant API_SECRET => $ENV{"API_SECRET"};
 use constant ACCESS_NONCE => time();
 use constant ACCESS_URI => 'https://coincheck.com/api/ec/buttons';
-
 
 my $user_agent = LWP::UserAgent::JSON->new(agent => 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36');
 my $req = HTTP::Request::JSON->new(GET => 'https://coincheck.jp/api/ticker');
@@ -23,27 +23,33 @@ my $tick = decode_json($res->content);
 
 say Dumper $tick;
 
-my $j = {button => {
-    name     => "ddddkottgdaizyobu",
-    currency => "JPY",
-    display_currency => "USD",
-    amount   => 10000
-}};
+my $j = {"button" => {
+    "name"     => "DTEST",
+    "currency" => "JPY",
+    "amount"   => 5000
+   }};
 
-my $body = encode_json($j);
+warn Dumper $j;
+#exit;
 
-my $user_agent = LWP::UserAgent::JSON->new(agent => 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36');
-my $req    = HTTP::Request::JSON->new(POST => ACCESS_URI);
+my $body = JSON->new->encode($j);
+
+my $ua = LWP::UserAgent::JSON->new(agent => 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36');
+my $req = HTTP::Request::JSON->new();
+$req->method('POST');
+$req->uri(ACCESS_URI);
+$req->json_content($j);
 $req->header(
-    'ACCESS-KEY'       => ACCESS_KEY,
-    'ACCESS-NONCE'     => ACCESS_NONCE,
-    'ACCESS-SIGNATURE' => hmac_sha256_hex(ACCESS_NONCE . ACCESS_URI . $body, API_SECRET)
+    ACCESS_KEY       => ACCESS_KEY,
+    ACCESS_NONCE     => ACCESS_NONCE,
+    ACCESS_SIGNATURE => hmac_sha256_hex(ACCESS_NONCE . ACCESS_URI . $req->content(), API_SECRET)
 );
 
-$req->json_content($j);
 
-my $res = $user_agent->request($req);
+warn $req->as_string();
 
+my $res = $ua->request($req);
+warn Dumper $res;
 my $pay = decode_json($res->content);
 if(!$pay->{success}){
     die(Dumper $pay);
